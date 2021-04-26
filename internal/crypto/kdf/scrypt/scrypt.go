@@ -34,7 +34,7 @@ func isPowerOfTwo(v uint) bool {
 
 }
 
-func (ScryptKDF) Construct(params kdf.KDFParams) (kdf.KDFEngine, error) {
+func (ScryptKDF) Construct(params kdf.KDFParams) (kdf.KDFImpl, error) {
 	// Validate the parameters first
 	paramsValid, err := (ScryptKDF{}).Validate(params)
 	if !paramsValid {
