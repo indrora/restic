@@ -1,4 +1,4 @@
-package crypto
+package scrypt
 
 import (
 	"errors"
@@ -7,7 +7,8 @@ import (
 	"math/rand"
 	"time"
 
-	"golang.org/x/crypto/scrypt"
+	"github.com/restic/restic/internal/crypto/kdf"
+	xscrypt "golang.org/x/crypto/scrypt"
 )
 
 const (
@@ -20,9 +21,34 @@ const (
 
 )
 
-type ScryptKDF struct{}
+type ScryptKDF struct {
+	n int
+	r int
+	p int
+}
 
-func (ScryptKDF) Validate(params KDFParams) (bool, error) {
+// Determine if a value is a power of two.
+// taken from https://graphics.stanford.edu/~seander/bithacks.html#DetermineIfPowerOf2
+func isPowerOfTwo(v uint) bool {
+	return (v & (v - 1)) == 0
+
+}
+
+func (ScryptKDF) Construct(params kdf.KDFParams) (kdf.KDFEngine, error) {
+	// Validate the parameters first
+	paramsValid, err := (ScryptKDF{}).Validate(params)
+	if !paramsValid {
+		return ScryptKDF{}, fmt.Errorf("invalid parameters to ScryptKDF: %v", err)
+	}
+
+	return ScryptKDF{
+		n: params[SCRYPT_PARAM_N].(int),
+		r: params[SCRYPT_PARAM_R].(int),
+		p: params[SCRYPT_PARAM_P].(int),
+	}, nil
+}
+
+func (ScryptKDF) Validate(params kdf.KDFParams) (bool, error) {
 	// We need to check that three different values are there
 
 	if len(params) != 3 {
@@ -62,7 +88,7 @@ func (ScryptKDF) Validate(params KDFParams) (bool, error) {
 	if nValue < 1 {
 		return false, errors.New("value of N < 1")
 	}
-	if (nValue & (nValue - 1)) == 0 {
+	if !isPowerOfTwo(uint(nValue)) {
 		return false, errors.New("n must be power of 2")
 	}
 
@@ -77,15 +103,11 @@ func (ScryptKDF) Validate(params KDFParams) (bool, error) {
 
 }
 
-func (ScryptKDF) Derive(params KDFParams, password string, salt []byte, len int) ([]byte, error) {
+func (engine ScryptKDF) Derive(password string, salt []byte, len int) ([]byte, error) {
 
 	// Walk through the crypto...
 
-	n := params[SCRYPT_PARAM_N].(int)
-	r := params[SCRYPT_PARAM_R].(int)
-	p := params[SCRYPT_PARAM_P].(int)
-
-	key, err := scrypt.Key([]byte(password), salt, n, r, p, len)
+	key, err := xscrypt.Key([]byte(password), salt, engine.n, engine.r, engine.p, len)
 
 	if err != nil {
 		return nil, err
@@ -95,9 +117,9 @@ func (ScryptKDF) Derive(params KDFParams, password string, salt []byte, len int)
 
 }
 
-func (ScryptKDF) Calibrate(limit time.Duration) (KDFParams, error) {
+func (ScryptKDF) Calibrate(limit time.Duration) (kdf.KDFParams, error) {
 	if limit == 0 {
-		limit = defaultTimeout
+		limit = kdf.DefaultCalibrationTimeout
 	}
 	// We're going to go with the suggestions from Filippo:
 	// https://blog.filippo.io/the-scrypt-parameters/
@@ -143,7 +165,7 @@ func (ScryptKDF) Calibrate(limit time.Duration) (KDFParams, error) {
 		}
 	}
 
-	return KDFParams{
+	return kdf.KDFParams{
 		SCRYPT_PARAM_N: int(math.Pow(2, float64(testNExponent))),
 		SCRYPT_PARAM_P: VALUE_P,
 		SCRYPT_PARAM_R: VALUE_R,
@@ -152,7 +174,7 @@ func (ScryptKDF) Calibrate(limit time.Duration) (KDFParams, error) {
 
 func timeScrypt(n int, pass []byte, salt []byte) (time.Duration, error) {
 	start := time.Now()
-	_, err := scrypt.Key(pass, salt, n, 8, 1, 32)
+	_, err := xscrypt.Key(pass, salt, n, 8, 1, 32)
 	if err != nil {
 		return -1, err
 	}

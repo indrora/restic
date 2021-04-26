@@ -12,29 +12,12 @@ import (
 
 const saltLength = 64
 const memoryWeight = 32
-const defaultTimeout time.Duration = 5 * time.Second
 
 // Params are the default parameters used for the key derivation function KDF().
 type Params struct {
 	N int
 	R int
 	P int
-}
-
-type KDFParams map[string]interface{}
-
-// A KDF Engine should derive a value from a password, salt, and length of key
-// as well as create optimal parameters for the given amount of time.
-
-type KDFEngine interface {
-
-	// Derive a key from the given parameters, password, salt, and length
-	Derive(KDFParams, string, []byte, int) ([]byte, error)
-	// return a set of KDF parameters that cause a single
-	// round to take as close to but no more than the given time
-	Calibrate(time.Duration) (KDFParams, error)
-	// Validate a set of parameters, returning `nil` if ok, error otherwise.
-	Validate(KDFParams) (bool, error)
 }
 
 // DefaultKDFParams are the default parameters used for Calibrate and KDF().
