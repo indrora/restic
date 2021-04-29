@@ -127,3 +127,32 @@ func TestConstuct(t *testing.T) {
 		}
 	}
 }
+
+/*
+   scrypt (P="password", S="NaCl",
+           N=1024, r=8, p=16, dkLen=64) =
+   fd ba be 1c 9d 34 72 00 78 56 e7 19 0d 01 e9 fe
+   7c 6a d7 cb c8 23 78 30 e7 73 76 63 4b 37 31 62
+   2e af 30 d9 2e 22 a3 88 6f f1 09 27 9d 98 30 da
+   c7 27 af b9 4a 83 ee 6d 83 60 cb df a2 cc 06 40
+
+*/
+
+func TestKnownVectors(t *testing.T) {
+	test_kdf, err := (ScryptKDF{}).Construct(kdf.KDFParams{
+		SCRYPT_PARAM_N: 1024,
+		SCRYPT_PARAM_R: 8,
+		SCRYPT_PARAM_P: 16,
+	})
+	if err != nil {
+		t.Fatalf("failed to init test vectors: %v", err)
+	}
+	kbytes, err := test_kdf.Derive("password", []byte("NaCl"), 64)
+	if err != nil {
+		t.Fatalf("failed with known test vectors: %v", err)
+	}
+	if kbytes[0] != 0xfd {
+		t.Fatalf("Error in calculation; expected %v got %v", 0xfd, kbytes[0])
+	}
+
+}
